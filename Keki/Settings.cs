@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Keki {
     internal class Settings {
-        public required String Cake { get; set; }
+        public required string Cake { get; set; }
         private static JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
 
         public static Settings GetDefault() {

@@ -34,21 +34,21 @@ var removeCurrentOption = new Option<bool>(
         description: "Remove current cake.");
 
 var clearCommand = new Command("clear", "Eat the cake.");
-clearCommand.SetHandler(ClearItems);
+clearCommand.SetHandler(ClearLayers);
 clearCommand.AddAlias("eat");
 rootCommand.Add(clearCommand);
 
 var listCommand = new Command("list", "List all layers in the cake.");
-listCommand.SetHandler(ListItems);
+listCommand.SetHandler(ListLayers);
 rootCommand.Add(listCommand);
 
 var popCommand = new Command("pop", "Eat the top layer of the cake.");
-popCommand.SetHandler(PopItem);
+popCommand.SetHandler(PopLayer);
 rootCommand.Add(popCommand);
 
 var pushCommand = new Command("push", "Add a layer onto the cake.");
 pushCommand.AddArgument(layerArgument);
-pushCommand.SetHandler((name) => PushItem(name!), layerArgument);
+pushCommand.SetHandler((name) => PushLayer(name!), layerArgument);
 rootCommand.Add(pushCommand);
 
 var cakeCommand = new Command("cake", "Manage cakes in the bakery.");
@@ -76,16 +76,17 @@ rootCommand.Handler = listCommand.Handler;
 
 return await rootCommand.InvokeAsync(args);
 
-void ClearItems() {
+void ClearLayers() {
     File.WriteAllText(cakePath, "");
+    SetEnvironmentVariables(null);
     Icing("No more layers in the cake.", ConsoleColor.Green);
 }
 
-void ListItems() {
+void ListLayers() {
     IceTheCake(GetTheCake());
 }
 
-void PopItem() {
+void PopLayer() {
     if (!File.Exists(cakePath)) {
         Icing("No layers in the cake.", ConsoleColor.Red);
         return;
@@ -101,7 +102,7 @@ void PopItem() {
     BakeTheCake(cake);
 }
 
-void PushItem(string? name) {
+void PushLayer(string? name) {
     Stack<string> cake = GetTheCake();
 
     if (name == null) {
@@ -137,7 +138,9 @@ void SetCake(string? name) {
     settings.Save(settingsPath);
     cakePath = Path.Combine(cakesPath, $"{name}.txt");
     Icing($"Set the cake to \"{name}\".", ConsoleColor.Green);
-    IceTheCake(GetTheCake());
+    Stack<string> cake = GetTheCake();
+    SetEnvironmentVariables(cake);
+    IceTheCake(cake);
 }
 
 void ListCakes() {
@@ -171,6 +174,7 @@ void RemoveCake(string? name, bool all = false, bool current = false) {
             for (int i = 0; i < files.Length; i++) {
                 File.Delete(files[i].FullName);
             }
+            SetEnvironmentVariables(null);
             Icing("Removed all cakes.", ConsoleColor.Green);
             return;
         }
@@ -198,7 +202,9 @@ void RemoveCake(string? name, bool all = false, bool current = false) {
     if (File.Exists(Path.Combine(cakesPath, $"{name}.txt"))) {
         File.Delete(Path.Combine(cakesPath, $"{name}.txt"));
         Icing($"Removed the cake \"{name}\".", ConsoleColor.Green);
-        IceTheCake(GetTheCake());
+        Stack<string> cake = GetTheCake();
+        SetEnvironmentVariables(cake);
+        IceTheCake(cake);
     }
     else {
         Icing($"The cake \"{name}\" does not exist.", ConsoleColor.Red);
@@ -227,6 +233,7 @@ void IceTheCake(Stack<string> cake) {
 }
 
 void BakeTheCake(Stack<string> cake) {
+    SetEnvironmentVariables(cake);
     _ = Directory.CreateDirectory(Path.GetDirectoryName(cakePath));
     using StreamWriter writer = new(cakePath);
     while (cake.Count > 0) {
@@ -254,4 +261,20 @@ void Icing(string line, ConsoleColor color) {
     Console.ForegroundColor = color;
     Console.WriteLine(line);
     Console.ResetColor();
+}
+
+void SetEnvironmentVariables(Stack<string>? cake) {
+    Environment.SetEnvironmentVariable("keki_cake", settings.Cake, EnvironmentVariableTarget.User);
+    if (cake == null) {
+        Environment.SetEnvironmentVariable("keki_layer", "none", EnvironmentVariableTarget.User);
+        Environment.SetEnvironmentVariable("keki_layers", "0", EnvironmentVariableTarget.User);
+        return;
+    }
+    Environment.SetEnvironmentVariable("keki_layers", cake.Count().ToString(), EnvironmentVariableTarget.User);
+    if (cake.TryPeek(out var layer)) {
+        Environment.SetEnvironmentVariable("keki_layer", layer, EnvironmentVariableTarget.User);
+    }
+    else {
+        Environment.SetEnvironmentVariable("keki_layer", "none", EnvironmentVariableTarget.User);
+    }
 }
